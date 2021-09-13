@@ -9,7 +9,7 @@
 #include "esp_adc_cal.h"
 #endif
 
-#define input_touch_1 26 //bluetooth on/off
+#define input_touch_1 26 //bluetooth on/off when held down for a preset duration
 //when button 2 and 3 pressed together clear all paired devices.
 #define input_touch_2 25 //volume up
 #define input_touch_3 33 //volume down
@@ -18,23 +18,33 @@
 #define output_led_2 13
 #define GPIO_OUTPUT_PIN_SEL  ((1ULL<<output_led_1) | (1ULL<<output_led_2))
 #define ESP_INTR_FLAG_DEFAULT 0
-#define debounceTimeout 10 
+#define debounceTimeout 50 
+#define btn1_longpress_time 500 //long_button_press_threshold
 
 volatile uint32_t intr_ticks = 0;
-uint32_t last_tick = 0;
+uint32_t last_tick = 0; //global no of ticks elapsed 
+
+//btn 1 press duration variables
+uint32_t start_pressed=0;
+uint32_t end_pressed = 0;
+uint32_t press_duration =0;
 
 static xQueueHandle gpio_vol_up_evt_queue = NULL;
 static xQueueHandle gpio_vol_down_evt_queue = NULL;
+static xQueueHandle gpio_bt_state_evt_queue = NULL;
 static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
     intr_ticks = xTaskGetTickCount();
-    //printf("Tick Count: %d\n",debounceTimeout);
     uint32_t gpio_num = (uint32_t) arg;
     if(gpio_num == 25){
         xQueueSendFromISR(gpio_vol_up_evt_queue, &gpio_num, NULL);
     }
-    else{
+    else if(gpio_num == 33){
         xQueueSendFromISR(gpio_vol_down_evt_queue, &gpio_num, NULL);
+    }
+    else{
+        //anyedge btn1
+        xQueueSendFromISR(gpio_bt_state_evt_queue, &gpio_num, NULL);
     }
 }
 
@@ -54,7 +64,6 @@ static void volume_up(void* arg){
 
         if(xQueueReceive(gpio_vol_up_evt_queue, &io_num, portMAX_DELAY) && (intr_ticks-last_tick)>debounceTimeout) {
             //check for debounce time
-            printf("Tick Count: %d\n",intr_ticks);
             printf("GPIO[%d] intr, val: %d\n", io_num, gpio_get_level(io_num));
             printf("Button 2 pressed Volume up\n");
         }
@@ -62,13 +71,25 @@ static void volume_up(void* arg){
     }
 }
 
-static void volume_down(){
+static void volume_down(void* arg){
     uint32_t io_num;
     for(;;){
         if(xQueueReceive(gpio_vol_down_evt_queue, &io_num, portMAX_DELAY) && (intr_ticks-last_tick)>debounceTimeout) {
-            printf("Tick Count: %d\n",intr_ticks);
             printf("GPIO[%d] intr, val: %d\n", io_num, gpio_get_level(io_num));
             printf("Button 3 pressed Volume down\n");
+
+        }
+        last_tick = intr_ticks;
+    }
+}
+
+static void set_bt_state(void* arg){
+    //check bt state flag
+    //compliment(if on turn of and vice versa) the bt state on each long btn1 press
+    uint32_t io_num;
+    for(;;){
+        if(xQueueReceive(gpio_bt_state_evt_queue, &io_num, portMAX_DELAY)){
+            printf("Btn 1 pressed/released");
         }
         last_tick = intr_ticks;
     }
@@ -89,7 +110,7 @@ void config_gpios(){
     gpio_config(&io_conf);
 
     //interrupt of rising edge
-    io_conf.intr_type = GPIO_PIN_INTR_POSEDGE;
+    io_conf.intr_type = GPIO_PIN_INTR_NEGEDGE;
     //bit mask of the pins, use GPIO26/25/33 
     io_conf.pin_bit_mask = GPIO_INPUT_PIN_SEL;
     //set as input mode    
@@ -98,17 +119,23 @@ void config_gpios(){
     io_conf.pull_up_en = 0;
     io_conf.pull_down_en = 1;
     gpio_config(&io_conf);
+    //change gpio interrupt type for the btn1
+    gpio_set_intr_type(input_touch_1, GPIO_INTR_ANYEDGE);
 
     //create a queue to handle volume up event from isr
     gpio_vol_up_evt_queue = xQueueCreate(10, sizeof(uint32_t));
     //create a queue to handle volume down event from isr
     gpio_vol_down_evt_queue = xQueueCreate(10, sizeof(uint32_t));
+    //create a queue to handle bt on/off from isr
+    gpio_bt_state_evt_queue = xQueueCreate(10, sizeof(uint32_t));
     //start gpio tasks
     xTaskCreate(volume_up, "volume_up", 2048, NULL, 10, NULL);
     xTaskCreate(volume_down, "volume_up", 2048, NULL, 10, NULL);
-
+    xTaskCreate(set_bt_state, "set_bt_state", 2048, NULL, 10, NULL);
     //install gpio isr service
     gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
+    //hook isr handler to btn1 gpio pin for bt on and off
+    gpio_isr_handler_add(input_touch_1, gpio_isr_handler, (void*) input_touch_1);
     //hook isr handler to volume up gpio pin
     gpio_isr_handler_add(input_touch_2, gpio_isr_handler, (void*) input_touch_2);
     //hook isr handler to volume down gpio pin
@@ -130,6 +157,6 @@ void app_main(void)
     while (1) {
         uint32_t value = get_vnsns_value();
         printf("The vsns value is:%d\n",value);
-        //vTaskDelay(1000/portTICK_PERIOD_MS);
+        vTaskDelay(500/portTICK_PERIOD_MS);
     }
 }
