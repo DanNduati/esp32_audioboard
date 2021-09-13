@@ -18,12 +18,17 @@
 #define output_led_2 13
 #define GPIO_OUTPUT_PIN_SEL  ((1ULL<<output_led_1) | (1ULL<<output_led_2))
 #define ESP_INTR_FLAG_DEFAULT 0
+#define debounceTimeout 10 
 
+volatile uint32_t intr_ticks = 0;
+uint32_t last_tick = 0;
 
 static xQueueHandle gpio_vol_up_evt_queue = NULL;
 static xQueueHandle gpio_vol_down_evt_queue = NULL;
 static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
+    intr_ticks = xTaskGetTickCount();
+    //printf("Tick Count: %d\n",debounceTimeout);
     uint32_t gpio_num = (uint32_t) arg;
     if(gpio_num == 25){
         xQueueSendFromISR(gpio_vol_up_evt_queue, &gpio_num, NULL);
@@ -44,21 +49,28 @@ void config_adc(){
 
 static void volume_up(void* arg){
     uint32_t io_num;
+
     for(;;){
-        if(xQueueReceive(gpio_vol_up_evt_queue, &io_num, portMAX_DELAY)) {
+
+        if(xQueueReceive(gpio_vol_up_evt_queue, &io_num, portMAX_DELAY) && (intr_ticks-last_tick)>debounceTimeout) {
+            //check for debounce time
+            printf("Tick Count: %d\n",intr_ticks);
             printf("GPIO[%d] intr, val: %d\n", io_num, gpio_get_level(io_num));
             printf("Button 2 pressed Volume up\n");
         }
+        last_tick = intr_ticks;
     }
 }
 
 static void volume_down(){
     uint32_t io_num;
     for(;;){
-        if(xQueueReceive(gpio_vol_down_evt_queue, &io_num, portMAX_DELAY)) {
+        if(xQueueReceive(gpio_vol_down_evt_queue, &io_num, portMAX_DELAY) && (intr_ticks-last_tick)>debounceTimeout) {
+            printf("Tick Count: %d\n",intr_ticks);
             printf("GPIO[%d] intr, val: %d\n", io_num, gpio_get_level(io_num));
             printf("Button 3 pressed Volume down\n");
         }
+        last_tick = intr_ticks;
     }
 }
 
@@ -118,6 +130,6 @@ void app_main(void)
     while (1) {
         uint32_t value = get_vnsns_value();
         printf("The vsns value is:%d\n",value);
-        vTaskDelay(1000/portTICK_PERIOD_MS);
+        //vTaskDelay(1000/portTICK_PERIOD_MS);
     }
 }
