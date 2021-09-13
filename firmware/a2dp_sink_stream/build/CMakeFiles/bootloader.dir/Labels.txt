@@ -1,0 +1,13 @@
+# Target labels
+ bootloader
+# Source files and their labels
+/home/daniel/Desktop/work/audioboard/firmware/a2dp_sink_stream/build/CMakeFiles/bootloader
+/home/daniel/Desktop/work/audioboard/firmware/a2dp_sink_stream/build/CMakeFiles/bootloader.rule
+/home/daniel/Desktop/work/audioboard/firmware/a2dp_sink_stream/build/CMakeFiles/bootloader-complete.rule
+/home/daniel/Desktop/work/audioboard/firmware/a2dp_sink_stream/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule
+/home/daniel/Desktop/work/audioboard/firmware/a2dp_sink_stream/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule
+/home/daniel/Desktop/work/audioboard/firmware/a2dp_sink_stream/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule
+/home/daniel/Desktop/work/audioboard/firmware/a2dp_sink_stream/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule
+/home/daniel/Desktop/work/audioboard/firmware/a2dp_sink_stream/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule
+/home/daniel/Desktop/work/audioboard/firmware/a2dp_sink_stream/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule
+/home/daniel/Desktop/work/audioboard/firmware/a2dp_sink_stream/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule
